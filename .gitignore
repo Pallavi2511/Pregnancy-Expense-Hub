@@ -1,0 +1,28 @@
+target/
+*.log
+*.tmp
+*.class
+*.jar
+*.war
+*.iml
+.idea/
+.vscode/
+.DS_Store
+**/bin/
+**/build/
+/pregnancy-app-data
+/uploads
+# Frontend dependencies and build
+frontend/node_modules/
+frontend/dist/
+
+# Environment files
+.env
+*.env
+
+# Local uploaded bills
+pregnancy-app-data/
+uploads/
+
+# Local Spring configuration
+src/main/resources/application.properties

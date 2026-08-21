@@ -1,6 +1,7 @@
 package com.example.expensetracker.controller;
 
 import com.example.expensetracker.service.ExpenseService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -17,11 +18,13 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/bills")
 public class BillController {
+
+    @Value("${file.upload-dir:C:/data/Pallavi/pregnancy-app-data}")
+    private String uploadDir;
 
     private final ExpenseService expenseService;
 
@@ -30,31 +33,45 @@ public class BillController {
     }
 
     @PostMapping("/upload")
-    public ResponseEntity<String> uploadBill(@RequestParam("file") MultipartFile file) throws IOException {
+    public ResponseEntity<String> uploadBill(
+            @RequestParam("file") MultipartFile file) throws IOException {
+
         String filename = expenseService.saveExpenseBill(file);
         return ResponseEntity.ok(filename);
     }
 
     @GetMapping("/{filename:.+}")
     public ResponseEntity<Resource> getBill(@PathVariable String filename) {
+
         try {
             filename = Paths.get(filename).getFileName().toString();
-            Path uploads = Paths.get("C:/Pallavi/pregnancy-app-data").toAbsolutePath().normalize();
+
+            Path uploads = Paths.get(uploadDir)
+                    .toAbsolutePath()
+                    .normalize();
+
             Path filePath = uploads.resolve(filename).normalize();
+
             if (Files.notExists(filePath) || !Files.isReadable(filePath)) {
                 return ResponseEntity.notFound().build();
             }
 
             Resource bill = expenseService.loadExpenseBill(filename);
+
             String contentType = Files.probeContentType(filePath);
+
             if (contentType == null) {
                 contentType = MediaType.APPLICATION_OCTET_STREAM_VALUE;
             }
 
             return ResponseEntity.ok()
                     .contentType(MediaType.parseMediaType(contentType))
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + bill.getFilename() + "\"")
+                    .header(
+                            HttpHeaders.CONTENT_DISPOSITION,
+                            "inline; filename=\"" + bill.getFilename() + "\""
+                    )
                     .body(bill);
+
         } catch (IOException ex) {
             return ResponseEntity.notFound().build();
         }

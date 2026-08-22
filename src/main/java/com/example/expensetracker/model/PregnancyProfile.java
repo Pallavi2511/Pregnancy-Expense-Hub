@@ -12,22 +12,15 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDate;
 
 @Entity
-@Table(name = "baby_shopping_expenses")
+@Table(name = "pregnancy_profile")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class BabyShoppingExpense {
+public class PregnancyProfile {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String description;
-    private String itemName;
-    private Integer quantity;
-    private String sizeAgeRange;
-    private Double amount;
-    private LocalDate date;
-    private String category;
-    private String bill;
+    private LocalDate dueDate;
 }

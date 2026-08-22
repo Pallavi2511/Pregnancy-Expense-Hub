@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Bar } from 'react-chartjs-2'
 import {
   Chart as ChartJS,
@@ -13,6 +13,16 @@ import {
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 
 export default function MonthlyChart({ expenses = [], monthlyAnalytics = null, onRefresh }) {
+  // Canvas-rendered chart text/grid colors don't follow Tailwind's dark: classes, so track the theme manually
+  const [isDarkMode, setIsDarkMode] = useState(() => document.documentElement.classList.contains('dark'))
+
+  useEffect(() => {
+    const root = document.documentElement
+    const observer = new MutationObserver(() => setIsDarkMode(root.classList.contains('dark')))
+    observer.observe(root, { attributes: true, attributeFilter: ['class'] })
+    return () => observer.disconnect()
+  }, [])
+
   const labels = Array.from({ length: 9 }, (_, i) => `Month ${i + 1}`)
   const monthlyTotals = useMemo(() => {
     if (monthlyAnalytics && Array.isArray(monthlyAnalytics)) {
@@ -62,7 +72,7 @@ export default function MonthlyChart({ expenses = [], monthlyAnalytics = null, o
             size: 14,
             weight: 'bold',
           },
-          color: '#E2E8F0',
+          color: isDarkMode ? '#E2E8F0' : '#334155',
         },
       },
       title: {
@@ -72,11 +82,11 @@ export default function MonthlyChart({ expenses = [], monthlyAnalytics = null, o
           size: 18,
           weight: 'bold',
         },
-        color: '#E2E8F0',
+        color: isDarkMode ? '#E2E8F0' : '#334155',
         padding: 20,
       },
       tooltip: {
-        backgroundColor: '#0f172a',
+        backgroundColor: isDarkMode ? '#0f172a' : '#1e293b',
         padding: 12,
         titleFont: {
           size: 14,
@@ -104,10 +114,10 @@ export default function MonthlyChart({ expenses = [], monthlyAnalytics = null, o
           font: {
             size: 12,
           },
-          color: '#64748B',
+          color: isDarkMode ? '#94A3B8' : '#475569',
         },
         grid: {
-          color: '#334155',
+          color: isDarkMode ? '#334155' : '#E2E8F0',
           drawBorder: true,
         },
         title: {
@@ -117,7 +127,7 @@ export default function MonthlyChart({ expenses = [], monthlyAnalytics = null, o
             size: 13,
             weight: 'bold',
           },
-          color: '#E2E8F0',
+          color: isDarkMode ? '#E2E8F0' : '#334155',
         },
       },
       x: {
@@ -125,7 +135,7 @@ export default function MonthlyChart({ expenses = [], monthlyAnalytics = null, o
           font: {
             size: 12,
           },
-          color: '#CBD5E1',
+          color: isDarkMode ? '#CBD5E1' : '#334155',
         },
         grid: {
           display: false,
@@ -137,7 +147,7 @@ export default function MonthlyChart({ expenses = [], monthlyAnalytics = null, o
             size: 13,
             weight: 'bold',
           },
-          color: '#E2E8F0',
+          color: isDarkMode ? '#E2E8F0' : '#334155',
         },
       },
     },

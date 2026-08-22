@@ -144,17 +144,16 @@ export default function Dashboard() {
             ))}
           </div>
         </div>
-        <div className="bg-white dark:bg-slate-950 rounded-lg shadow-md border border-gray-200 dark:border-slate-700 p-6">
-          <div className="flex items-start justify-between gap-4">
+        <div className="self-start bg-white dark:bg-slate-950 rounded-lg shadow-md border border-gray-200 dark:border-slate-700 p-6">
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-coral/15 text-lg">🧾</span>
             <div>
-              <p className="text-sm uppercase tracking-wide text-purple-700 font-semibold">Bill Count</p>
-              <p className="mt-3 text-base text-gray-700 dark:text-slate-300">Expenses with uploaded bills</p>
+              <p className="text-sm uppercase tracking-wide text-purple-700 dark:text-purple-300 font-semibold">Bill Count</p>
+              <p className="text-xs text-gray-500 dark:text-slate-400">Expenses with uploaded bills</p>
             </div>
-            <span className="inline-flex items-center rounded-full bg-coral/15 text-coral px-3 py-1 text-xs font-semibold">{summary.billsCount}</span>
           </div>
-          <div className="mt-6 rounded-lg bg-gray-50 dark:bg-slate-900 p-4 text-gray-700 dark:text-slate-300">
-            <p className="text-sm">Keep bill images attached to support reimbursement and documentation.</p>
-          </div>
+          <p className="mt-4 text-4xl font-extrabold text-gray-900 dark:text-white">{summary.billsCount}</p>
+          <p className="mt-2 text-xs text-gray-500 dark:text-slate-400">Keep bill images attached to support reimbursement and documentation.</p>
         </div>
       </div>
 

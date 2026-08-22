@@ -9,25 +9,18 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDate;
-
 @Entity
-@Table(name = "baby_shopping_expenses")
+@Table(name = "baby_shopping_wishlist_items")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class BabyShoppingExpense {
+public class BabyShoppingWishlistItem {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String description;
-    private String itemName;
-    private Integer quantity;
-    private String sizeAgeRange;
-    private Double amount;
-    private LocalDate date;
-    private String category;
-    private String bill;
+    private String name;
+    private Double estimatedCost;
+    private String priority;
 }

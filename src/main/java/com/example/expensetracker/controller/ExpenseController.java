@@ -14,9 +14,13 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 @RestController
 @RequestMapping("/api/expenses")
@@ -33,7 +37,7 @@ public class ExpenseController {
 
     @PostMapping
     public ResponseEntity<Expense> addExpense(@RequestPart(value = "expense", required = false) Expense expense,
-                                              @RequestPart(value = "file", required = false) MultipartFile file) throws IOException {
+            @RequestPart(value = "file", required = false) MultipartFile file) throws IOException {
         if (file != null && !file.isEmpty()) {
             String storedFilename = expenseService.saveExpenseBill(file);
             if (expense == null) {
@@ -48,7 +52,7 @@ public class ExpenseController {
 
     @PostMapping("/uploadBill")
     public ResponseEntity<Expense> uploadBill(@RequestPart("expense") Expense expense,
-                                          @RequestPart("file") MultipartFile file) throws IOException {
+            @RequestPart("file") MultipartFile file) throws IOException {
         String filename = expenseService.saveExpenseBill(file);
         expense.setBillFilePath(filename);
         Expense savedExpense = expenseService.saveExpense(expense);
@@ -97,7 +101,7 @@ public class ExpenseController {
 
     @PutMapping("/{id}")
     public ResponseEntity<Expense> updateExpense(@PathVariable Long id,
-                                                 @RequestBody Expense expense) {
+            @RequestBody Expense expense) {
         Optional<Expense> existingExpense = expenseService.getExpenseById(id);
         if (existingExpense.isEmpty()) {
             return ResponseEntity.notFound().build();
@@ -117,8 +121,8 @@ public class ExpenseController {
 
     @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Expense> updateExpenseWithFile(@PathVariable Long id,
-                                                         @RequestPart("expense") Expense expense,
-                                                         @RequestPart(value = "file", required = false) MultipartFile file) throws IOException {
+            @RequestPart("expense") Expense expense,
+            @RequestPart(value = "file", required = false) MultipartFile file) throws IOException {
         Optional<Expense> existingExpense = expenseService.getExpenseById(id);
         if (existingExpense.isEmpty()) {
             return ResponseEntity.notFound().build();
@@ -204,7 +208,41 @@ public class ExpenseController {
 
     @GetMapping("/month/{month}/total")
     public ResponseEntity<Double> getMonthlyTotal(@PathVariable int month,
-                                                  @RequestParam Long userId) {
+            @RequestParam Long userId) {
         return ResponseEntity.ok(expenseService.getTotalExpensesByMonth(userId, month));
+    }
+
+    @GetMapping("/bills/export-zip")
+    public ResponseEntity<Resource> exportBillsAsZip() throws IOException {
+        Path uploadPath = Paths.get(uploadDir).toAbsolutePath().normalize();
+
+        // De-dupe in case multiple expenses reference the same bill file
+        Set<String> billFilenames = new LinkedHashSet<>();
+        for (Expense expense : expenseService.getAllExpenses()) {
+            String billFilePath = expense.getBillFilePath();
+            if (billFilePath != null && !billFilePath.isBlank()) {
+                billFilenames.add(billFilePath);
+            }
+        }
+
+        Path tempZip = Files.createTempFile("bills-export-", ".zip");
+        tempZip.toFile().deleteOnExit();
+        try (ZipOutputStream zipOut = new ZipOutputStream(Files.newOutputStream(tempZip))) {
+            for (String filename : billFilenames) {
+                Path billPath = uploadPath.resolve(filename).normalize();
+                if (!billPath.startsWith(uploadPath) || Files.notExists(billPath) || !Files.isReadable(billPath)) {
+                    continue;
+                }
+                zipOut.putNextEntry(new ZipEntry(filename));
+                Files.copy(billPath, zipOut);
+                zipOut.closeEntry();
+            }
+        }
+
+        Resource zipResource = new org.springframework.core.io.UrlResource(tempZip.toUri());
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"bills-export.zip\"")
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .body(zipResource);
     }
 }

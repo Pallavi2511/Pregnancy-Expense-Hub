@@ -1,6 +1,9 @@
 
 import { useEffect, useState } from 'react'
 import api from '../api'
+import { exportExpensesToCSV, exportExpensesToPDF } from '../utils/exportUtils'
+import ConfirmDialog from './ConfirmDialog'
+import { useToast } from '../context/ToastContext'
 
 const categories = [
   'Doctor Visit',
@@ -13,7 +16,33 @@ const categories = [
   'Travel',
 ]
 
+const IMAGE_EXTENSIONS = /\.(jpe?g|png|gif|webp|bmp)$/i
+
+function BillThumbnail({ filename, url }) {
+  const [imgError, setImgError] = useState(false)
+  const isImage = IMAGE_EXTENSIONS.test(filename)
+
+  if (isImage && !imgError) {
+    return (
+      <img
+        src={url}
+        alt="Bill preview"
+        loading="lazy"
+        onError={() => setImgError(true)}
+        className="h-12 w-12 rounded-md object-cover border border-gray-200 dark:border-slate-600 bg-white"
+      />
+    )
+  }
+
+  return (
+    <span className="flex h-12 w-12 items-center justify-center rounded-md border border-gray-200 dark:border-slate-600 bg-gray-100 dark:bg-slate-800 text-xl">
+      📄
+    </span>
+  )
+}
+
 export default function ExpenseList({ expenses = [], onDelete, onRefresh }) {
+  const toast = useToast()
   const [localExpenses, setLocalExpenses] = useState(expenses)
   const [deletingId, setDeletingId] = useState(null)
   const [editingId, setEditingId] = useState(null)
@@ -27,14 +56,26 @@ export default function ExpenseList({ expenses = [], onDelete, onRefresh }) {
     billFilePath: '',
     billFile: null,
   })
-  const [error, setError] = useState(null)
-  const [successMessage, setSuccessMessage] = useState(null)
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [isExportingBills, setIsExportingBills] = useState(false)
+  const [deleteTargetId, setDeleteTargetId] = useState(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
 
   useEffect(() => {
     setLocalExpenses(expenses)
   }, [expenses])
+
+  const totalPages = Math.max(1, Math.ceil(localExpenses.length / pageSize))
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages)
+    }
+  }, [currentPage, totalPages])
+
+  const paginatedExpenses = localExpenses.slice((currentPage - 1) * pageSize, currentPage * pageSize)
 
   const handleRefresh = () => {
     if (onRefresh) {
@@ -45,26 +86,62 @@ export default function ExpenseList({ expenses = [], onDelete, onRefresh }) {
   const getBillUrl = (filename) =>
     `http://localhost:8080/api/bills/${encodeURIComponent(filename)}`
 
-  const handleDelete = async (id) => {
+  const handleExportCSV = () => {
+    exportExpensesToCSV(localExpenses, `expenses-${new Date().toISOString().split('T')[0]}.csv`)
+  }
+
+  const handleExportPDF = () => {
+    exportExpensesToPDF(localExpenses, `expenses-${new Date().toISOString().split('T')[0]}.pdf`, 'Pregnancy Expense Report')
+  }
+
+  const handleExportBillsZip = async () => {
+    try {
+      setIsExportingBills(true)
+      const response = await api.get('/api/expenses/bills/export-zip', { responseType: 'blob' })
+      const url = URL.createObjectURL(response.data)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'bills-export.zip'
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('Failed to export bills', err)
+      toast.error('Failed to export bills')
+    } finally {
+      setIsExportingBills(false)
+    }
+  }
+
+  const handleDelete = (id) => {
     if (!id) return
-    const ok = window.confirm('Are you sure you want to delete this expense?')
-    if (!ok) return
+    setDeleteTargetId(id)
+  }
+
+  const cancelDelete = () => {
+    if (deletingId) return
+    setDeleteTargetId(null)
+  }
+
+  const confirmDelete = async () => {
+    const id = deleteTargetId
+    if (!id) return
 
     try {
       setDeletingId(id)
-      setError(null)
       await api.delete(`/api/expenses/${id}`)
-      setSuccessMessage('Expense deleted successfully')
+      toast.success('Expense deleted successfully')
       setLocalExpenses((prev) => prev.filter((expense) => expense.id !== id))
       if (onDelete) {
         onDelete(id)
       }
-      setTimeout(() => setSuccessMessage(null), 3000)
     } catch (err) {
       console.error('Delete failed', err)
-      setError('Failed to delete expense')
+      toast.error('Failed to delete expense')
     } finally {
       setDeletingId(null)
+      setDeleteTargetId(null)
     }
   }
 
@@ -80,8 +157,6 @@ export default function ExpenseList({ expenses = [], onDelete, onRefresh }) {
       billFile: null,
     })
     setEditingId(expense.id)
-    setError(null)
-    setSuccessMessage(null)
     setIsEditOpen(true)
   }
 
@@ -106,7 +181,6 @@ export default function ExpenseList({ expenses = [], onDelete, onRefresh }) {
 
   const handleEditSave = async () => {
     if (!editingId || isSaving) return
-    setError(null)
     setIsSaving(true)
     try {
       const updatedExpense = {
@@ -138,12 +212,11 @@ export default function ExpenseList({ expenses = [], onDelete, onRefresh }) {
           expense.id === editingId ? { ...expense, ...savedExpense } : expense
         )
       )
-      setSuccessMessage('Expense updated successfully')
+      toast.success('Expense updated successfully')
       closeEditModal()
-      setTimeout(() => setSuccessMessage(null), 3000)
     } catch (err) {
       console.error('Update failed', err)
-      setError('Failed to update expense')
+      toast.error('Failed to update expense')
     } finally {
       setIsSaving(false)
     }
@@ -163,70 +236,61 @@ export default function ExpenseList({ expenses = [], onDelete, onRefresh }) {
         <p className="text-black dark:text-white">Total Expenses: {localExpenses.length}</p>
       </div>
 
-      {error && (
-        <div className="bg-rose-950 border border-rose-700 rounded-lg p-4 m-6">
-          <p className="text-rose-200 font-semibold">{error}</p>
-        </div>
-      )}
-
       {expenses.length === 0 ? (
         <div className="p-8 text-center">
-          <p className="text-black text-lg font-semibold">No expenses recorded yet</p>
-          <p className="text-gray-800 mt-2">Add your first expense to get started</p>
+          <p className="text-gray-900 dark:text-white text-lg font-semibold">No expenses recorded yet</p>
+          <p className="text-gray-600 dark:text-slate-300 mt-2">Add your first expense to get started</p>
         </div>
       ) : (
         <div className="overflow-x-auto">
-          {successMessage && (
-            <div className="bg-emerald-950 border border-emerald-700 rounded-lg p-4 mb-4">
-              <p className="text-emerald-200 font-semibold">{successMessage}</p>
-            </div>
-          )}
           <table className="w-full">
             <thead className="bg-gray-100 border-b-2 border-gray-200 dark:bg-slate-800 dark:border-slate-700">
-                <tr>
-                  <th className="px-6 py-3 text-left text-sm font-bold text-black dark:text-white">Description</th>
-                  <th className="px-6 py-3 text-left text-sm font-bold text-black dark:text-white">Amount</th>
-                  <th className="px-6 py-3 text-left text-sm font-bold text-black dark:text-white">Date</th>
-                  <th className="px-6 py-3 text-left text-sm font-bold text-black dark:text-white">Category</th>
-                  <th className="px-6 py-3 text-left text-sm font-bold text-black dark:text-white">Pregnancy Month</th>
-                  <th className="px-6 py-3 text-left text-sm font-bold text-black dark:text-white">Bill</th>
-                  <th className="px-6 py-3 text-left text-sm font-bold text-black dark:text-white">Actions</th>
-                </tr>
+              <tr>
+                <th className="px-6 py-3 text-left text-sm font-bold text-black dark:text-white">Description</th>
+                <th className="px-6 py-3 text-left text-sm font-bold text-black dark:text-white">Amount</th>
+                <th className="px-6 py-3 text-left text-sm font-bold text-black dark:text-white">Date</th>
+                <th className="px-6 py-3 text-left text-sm font-bold text-black dark:text-white">Category</th>
+                <th className="px-6 py-3 text-left text-sm font-bold text-black dark:text-white">Pregnancy Month</th>
+                <th className="px-6 py-3 text-left text-sm font-bold text-black dark:text-white">Bill</th>
+                <th className="px-6 py-3 text-left text-sm font-bold text-black dark:text-white">Actions</th>
+              </tr>
             </thead>
             <tbody>
-              {localExpenses.map((expense, index) => (
+              {paginatedExpenses.map((expense, index) => (
                 <tr
                   key={expense.id || index}
                   className="border-b border-gray-200 hover:bg-gray-100 dark:border-slate-700 dark:hover:bg-slate-800 transition duration-150 ease-in-out"
                 >
-                    <td className="px-6 py-4 text-lg font-bold text-gray-900 dark:text-white">{expense.description || 'N/A'}</td>
-                    <td className="px-6 py-4 text-sm font-bold text-gray-900 dark:text-teal-300">
-                      {rupee.format(expense.amount || 0)}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-800 dark:text-slate-300">{formatDate(expense.date)}</td>
-                    <td className="px-6 py-4 text-sm">
-                      <span className="bg-pink-100 text-pink-700 px-3 py-1 rounded-full text-xs font-semibold hover:bg-pink-200 transition-colors duration-200 dark:bg-pink-200/10 dark:text-gray-300">
-                        {expense.category || 'Uncategorized'}
+                  <td className="px-6 py-4 text-lg font-bold text-gray-900 dark:text-white">{expense.description || 'N/A'}</td>
+                  <td className="px-6 py-4 text-sm font-bold text-gray-900 dark:text-teal-300">
+                    {rupee.format(expense.amount || 0)}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-800 dark:text-slate-300">{formatDate(expense.date)}</td>
+                  <td className="px-6 py-4 text-sm">
+                    <span className="bg-pink-100 text-pink-700 px-3 py-1 rounded-full text-xs font-semibold hover:bg-pink-200 transition-colors duration-200 dark:bg-pink-200/10 dark:text-gray-300">
+                      {expense.category || 'Uncategorized'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-sm text-center">
+                    {expense.pregnancyMonth ? (
+                      <span className="bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-xs font-semibold">
+                        Month {expense.pregnancyMonth}
                       </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-center">
-                      {expense.pregnancyMonth ? (
-                        <span className="bg-purple-100 text-purple-700 px-3 py-1 rounded-full text-xs font-semibold">
-                          Month {expense.pregnancyMonth}
-                        </span>
-                      ) : (
-                        <span className="text-gray-400">—</span>
-                      )}
-                    </td>
+                    ) : (
+                      <span className="text-gray-400">—</span>
+                    )}
+                  </td>
                   <td className="px-6 py-4 text-sm">
                     {expense.billFilePath ? (
                       <a
                         href={getBillUrl(expense.billFilePath)}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-accent hover:text-blue-700 font-bold underline"
+                        title="View Bill"
+                        className="group flex w-fit items-center gap-2"
                       >
-                        View Bill
+                        <BillThumbnail filename={expense.billFilePath} url={getBillUrl(expense.billFilePath)} />
+                        <span className="text-accent group-hover:text-blue-700 font-semibold underline text-xs">View</span>
                       </a>
                     ) : (
                       <span className="text-gray-800 dark:text-slate-300">No Bill</span>
@@ -258,7 +322,72 @@ export default function ExpenseList({ expenses = [], onDelete, onRefresh }) {
         </div>
       )}
 
-      <div className="px-6 py-4 bg-slate-950 border-t border-slate-700 flex justify-end transition duration-500">
+      {localExpenses.length > 0 && (
+        <div className="px-6 py-4 border-t border-gray-200 dark:border-slate-700 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-slate-300">
+            <span>Rows per page</span>
+            <select
+              value={pageSize}
+              onChange={(e) => {
+                setPageSize(Number(e.target.value))
+                setCurrentPage(1)
+              }}
+              className="rounded-md border border-gray-300 bg-white text-gray-900 px-2 py-1 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+            >
+              {[10, 25, 50].map((size) => (
+                <option key={size} value={size}>{size}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-3 text-sm text-gray-600 dark:text-slate-300">
+            <span>
+              Page {currentPage} of {totalPages}
+            </span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className="rounded-md border border-gray-300 bg-white px-3 py-1 font-semibold text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                className="rounded-md border border-gray-300 bg-white px-3 py-1 font-semibold text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="px-6 py-4 bg-gray-50 dark:bg-slate-950 border-t border-gray-200 dark:border-slate-700 flex flex-wrap justify-end gap-3 transition duration-500">
+        <button
+          onClick={handleExportCSV}
+          disabled={localExpenses.length === 0}
+          className="bg-white hover:bg-gray-100 text-gray-700 border border-gray-300 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-100 dark:border-slate-600 font-bold py-2 px-4 rounded transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Export CSV
+        </button>
+        <button
+          onClick={handleExportPDF}
+          disabled={localExpenses.length === 0}
+          className="bg-white hover:bg-gray-100 text-gray-700 border border-gray-300 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-100 dark:border-slate-600 font-bold py-2 px-4 rounded transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Export PDF
+        </button>
+        <button
+          onClick={handleExportBillsZip}
+          disabled={isExportingBills}
+          className="bg-white hover:bg-gray-100 text-gray-700 border border-gray-300 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-100 dark:border-slate-600 font-bold py-2 px-4 rounded transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isExportingBills ? 'Preparing ZIP...' : 'Download Bills (ZIP)'}
+        </button>
         <button
           onClick={handleRefresh}
           className="bg-primary hover:bg-green-600 text-white font-bold py-2 px-6 rounded transition duration-200"
@@ -368,9 +497,19 @@ export default function ExpenseList({ expenses = [], onDelete, onRefresh }) {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={deleteTargetId !== null}
+        title="Delete this expense?"
+        message="This action cannot be undone. The expense and its attached bill link will be permanently removed."
+        confirmLabel="Delete"
+        isConfirming={deletingId !== null}
+        onConfirm={confirmDelete}
+        onCancel={cancelDelete}
+      />
     </div>
   )
 }
- 
+
 
 

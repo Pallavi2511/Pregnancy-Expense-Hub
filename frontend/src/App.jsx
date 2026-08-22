@@ -16,7 +16,7 @@ function App() {
 
   return (
     <Router>
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-500">
+      <div className="min-h-screen bg-warmBg dark:bg-slate-950 transition-colors duration-500">
         <div className="container mx-auto px-4 py-6">
           <nav className="mb-8 rounded-3xl border border-slate-200 bg-white/90 p-4 shadow-xl shadow-slate-200/50 backdrop-blur dark:border-slate-800 dark:bg-slate-900/90 dark:shadow-slate-950/40 transition duration-500">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">

@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import api from '../api'
+import ConfirmDialog from './ConfirmDialog'
+import { useToast } from '../context/ToastContext'
 
 const categories = ['Pediatric Visits', 'Vaccinations', 'Baby Food', 'Postpartum Care']
 
@@ -9,6 +11,7 @@ const currencyFormatter = new Intl.NumberFormat('en-IN', {
 })
 
 export default function PostPregnancy() {
+  const toast = useToast()
   const [expenses, setExpenses] = useState([])
   const [form, setForm] = useState({
     description: '',
@@ -23,9 +26,9 @@ export default function PostPregnancy() {
     highestMonth: { month: null, amount: 0 },
     average: 0,
   })
-  const [error, setError] = useState(null)
-  const [success, setSuccess] = useState(null)
   const [editingId, setEditingId] = useState(null)
+  const [deleteTargetId, setDeleteTargetId] = useState(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const fetchExpenses = async () => {
     try {
@@ -33,7 +36,7 @@ export default function PostPregnancy() {
       setExpenses(response.data || [])
     } catch (err) {
       console.error('Failed to load post-pregnancy expenses', err)
-      setError('Unable to load post-pregnancy expenses')
+      toast.error('Unable to load post-pregnancy expenses')
     }
   }
 
@@ -64,17 +67,13 @@ export default function PostPregnancy() {
       bill: '',
     })
     setEditingId(null)
-    setError(null)
-    setSuccess(null)
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    setError(null)
-    setSuccess(null)
 
     if (!form.description || !form.amount || !form.date) {
-      setError('Please complete all required fields.')
+      toast.error('Please complete all required fields.')
       return
     }
 
@@ -90,10 +89,10 @@ export default function PostPregnancy() {
 
       if (editingId) {
         await api.put(`/api/post-pregnancy/${editingId}`, payload)
-        setSuccess('Expense updated successfully.')
+        toast.success('Expense updated successfully.')
       } else {
         await api.post('/api/post-pregnancy', payload)
-        setSuccess('Expense added successfully.')
+        toast.success('Expense added successfully.')
       }
 
       resetForm()
@@ -101,7 +100,7 @@ export default function PostPregnancy() {
       await fetchSummary()
     } catch (err) {
       console.error('Save failed', err)
-      setError('Failed to save the expense.')
+      toast.error('Failed to save the expense.')
     } finally {
       setLoading(false)
     }
@@ -119,17 +118,31 @@ export default function PostPregnancy() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  const handleDelete = async (id) => {
-    const confirmed = window.confirm('Delete this post-pregnancy expense?')
-    if (!confirmed) return
+  const handleDelete = (id) => {
+    setDeleteTargetId(id)
+  }
+
+  const cancelDelete = () => {
+    if (isDeleting) return
+    setDeleteTargetId(null)
+  }
+
+  const confirmDelete = async () => {
+    const id = deleteTargetId
+    if (!id) return
 
     try {
+      setIsDeleting(true)
       await api.delete(`/api/post-pregnancy/${id}`)
+      toast.success('Expense deleted successfully.')
       await fetchExpenses()
       await fetchSummary()
     } catch (err) {
       console.error('Delete failed', err)
-      setError('Failed to delete expense.')
+      toast.error('Failed to delete expense.')
+    } finally {
+      setIsDeleting(false)
+      setDeleteTargetId(null)
     }
   }
 
@@ -167,9 +180,6 @@ export default function PostPregnancy() {
             Reset form
           </button>
         </div>
-
-        {error && <div className="mt-6 rounded-2xl bg-rose-50 p-4 text-rose-700 dark:bg-rose-950/40 dark:text-rose-200">{error}</div>}
-        {success && <div className="mt-6 rounded-2xl bg-emerald-50 p-4 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200">{success}</div>}
 
         <form onSubmit={handleSubmit} className="mt-8 grid gap-6 lg:grid-cols-2">
           <label className="space-y-2 text-sm text-slate-700 dark:text-slate-200">
@@ -282,6 +292,16 @@ export default function PostPregnancy() {
           </table>
         </div>
       </div>
+
+      <ConfirmDialog
+        isOpen={deleteTargetId !== null}
+        title="Delete this post-pregnancy expense?"
+        message="This action cannot be undone."
+        confirmLabel="Delete"
+        isConfirming={isDeleting}
+        onConfirm={confirmDelete}
+        onCancel={cancelDelete}
+      />
     </div>
   )
 }

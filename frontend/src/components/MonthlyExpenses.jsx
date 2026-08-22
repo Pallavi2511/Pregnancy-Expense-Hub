@@ -44,7 +44,7 @@ export default function MonthlyExpenses({ defaultMonth = 1 }) {
   const months = Array.from({ length: 9 }, (_, i) => ({ value: i + 1, label: `Month ${i + 1}` }))
 
   return (
-    <div className="bg-white rounded-lg shadow overflow-hidden border border-gray-100">
+    <div className="bg-white dark:bg-slate-950 rounded-lg shadow overflow-hidden border border-gray-100 dark:border-slate-700 transition duration-500">
       <div className="px-6 py-4 bg-gradient-to-r from-purple-600 via-teal-500 to-cyan-500 text-white">
         <h2 className="text-2xl font-bold">Monthly Expenses</h2>
         <p className="text-white opacity-90">Select a pregnancy month to view totals</p>
@@ -52,11 +52,11 @@ export default function MonthlyExpenses({ defaultMonth = 1 }) {
 
       <div className="p-6 space-y-6">
         <div className="flex items-center justify-between">
-          <label className="block text-sm font-semibold text-gray-700">Pregnancy Month</label>
+          <label className="block text-sm font-semibold text-gray-700 dark:text-slate-300">Pregnancy Month</label>
           <select
             value={selectedMonth}
             onChange={(e) => setSelectedMonth(Number(e.target.value))}
-            className="rounded-md border px-3 py-2"
+            className="rounded-md border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-gray-900 dark:text-slate-100 px-3 py-2"
           >
             {months.map((m) => (
               <option key={m.value} value={m.value}>
@@ -67,43 +67,43 @@ export default function MonthlyExpenses({ defaultMonth = 1 }) {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-white rounded-lg shadow p-4 border border-gray-100">
-            <div className="text-sm text-gray-500">Selected Month</div>
-            <div className="mt-2 text-2xl font-bold">Month {selectedMonth}</div>
+          <div className="bg-white dark:bg-slate-900 rounded-lg shadow p-4 border border-gray-100 dark:border-slate-700">
+            <div className="text-sm text-gray-500 dark:text-slate-400">Selected Month</div>
+            <div className="mt-2 text-2xl font-bold text-gray-900 dark:text-slate-100">Month {selectedMonth}</div>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-4 border border-gray-100">
-            <div className="text-sm text-gray-500">Total Amount</div>
-            <div className="mt-2 text-2xl font-extrabold text-primary">{loading ? 'Loading...' : rupee.format(total)}</div>
+          <div className="bg-white dark:bg-slate-900 rounded-lg shadow p-4 border border-gray-100 dark:border-slate-700">
+            <div className="text-sm text-gray-500 dark:text-slate-400">Total Amount</div>
+            <div className="mt-2 text-2xl font-extrabold text-primary dark:text-teal-300">{loading ? 'Loading...' : rupee.format(total)}</div>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-4 border border-gray-100">
-            <div className="text-sm text-gray-500">Number of Expenses</div>
-            <div className="mt-2 text-2xl font-bold">{loading ? '...' : expenses.length}</div>
+          <div className="bg-white dark:bg-slate-900 rounded-lg shadow p-4 border border-gray-100 dark:border-slate-700">
+            <div className="text-sm text-gray-500 dark:text-slate-400">Number of Expenses</div>
+            <div className="mt-2 text-2xl font-bold text-gray-900 dark:text-slate-100">{loading ? '...' : expenses.length}</div>
           </div>
         </div>
 
-        {error && <div className="text-sm text-red-600">{error}</div>}
+        {error && <div className="text-sm text-red-600 dark:text-rose-400">{error}</div>}
 
         {expenses.length === 0 && !loading ? (
-          <div className="text-center py-12 text-gray-500">No expenses recorded for Month {selectedMonth}</div>
+          <div className="text-center py-12 text-gray-500 dark:text-slate-400">No expenses recorded for Month {selectedMonth}</div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {expenses.map((expense, idx) => (
-              <div key={expense.id ?? idx} className="bg-white rounded-lg p-4 border border-gray-100 hover:shadow-md transition">
+              <div key={expense.id ?? idx} className="bg-white dark:bg-slate-900 rounded-lg p-4 border border-gray-100 dark:border-slate-700 hover:shadow-md transition">
                 <div className="flex justify-between items-start mb-2">
                   <div className="flex-1">
-                    <h4 className="font-bold text-gray-800">{expense.description || 'Unnamed'}</h4>
-                    <p className="text-sm text-gray-500">{expense.date ? new Date(expense.date).toLocaleDateString() : ''}</p>
+                    <h4 className="font-bold text-gray-800 dark:text-slate-100">{expense.description || 'Unnamed'}</h4>
+                    <p className="text-sm text-gray-500 dark:text-slate-400">{expense.date ? new Date(expense.date).toLocaleDateString() : ''}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-lg font-bold text-accent">{rupee.format(expense.amount || 0)}</p>
+                    <p className="text-lg font-bold text-accent dark:text-teal-300">{rupee.format(expense.amount || 0)}</p>
                   </div>
                 </div>
                 <div className="flex gap-2 flex-wrap">
-                  <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs font-semibold">{expense.category || 'Other'}</span>
+                  <span className="bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300 px-2 py-1 rounded text-xs font-semibold">{expense.category || 'Other'}</span>
                   {expense.billFilePath && (
-                    <a href={`http://localhost:8080/api/bills/${encodeURIComponent(expense.billFilePath)}`} target="_blank" rel="noopener noreferrer" className="text-primary text-xs font-semibold">View Bill</a>
+                    <a href={`http://localhost:8080/api/bills/${encodeURIComponent(expense.billFilePath)}`} target="_blank" rel="noopener noreferrer" className="text-primary dark:text-teal-300 text-xs font-semibold">View Bill</a>
                   )}
                 </div>
               </div>

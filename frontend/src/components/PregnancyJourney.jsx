@@ -30,6 +30,12 @@ const dietSuggestions = {
 
 export default function PregnancyJourney() {
   const [progress, setProgress] = useState(null)
+  const [pregnancyWeek, setPregnancyWeek] = useState(null)
+  const [development, setDevelopment] = useState(null)
+  const [dateMethod, setDateMethod] = useState('dueDate')
+  const [dateValue, setDateValue] = useState('')
+  const [isSavingDate, setIsSavingDate] = useState(false)
+  const [dateError, setDateError] = useState('')
   const [timeline, setTimeline] = useState([])
   const [checklist, setChecklist] = useState([])
   const [growth, setGrowth] = useState([])
@@ -39,12 +45,14 @@ export default function PregnancyJourney() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [progressResponse, timelineResponse, checklistResponse, growthResponse, insightsResponse] = await Promise.all([
+        const [progressResponse, timelineResponse, checklistResponse, growthResponse, insightsResponse, pregnancyWeekResponse, developmentResponse] = await Promise.all([
           api.get('/api/journey/progress'),
           api.get('/api/journey/timeline'),
           api.get('/api/journey/checklist'),
           api.get('/api/journey/baby-growth'),
           api.get('/api/journey/insights'),
+          api.get('/api/journey/pregnancy-week'),
+          api.get('/api/journey/this-week-development'),
         ])
 
         setProgress(progressResponse.data)
@@ -52,6 +60,8 @@ export default function PregnancyJourney() {
         setChecklist(checklistResponse.data || [])
         setGrowth(growthResponse.data || [])
         setInsights(insightsResponse.data || {})
+        setPregnancyWeek(pregnancyWeekResponse.data || {})
+        setDevelopment(developmentResponse.data || {})
       } catch (error) {
         console.error('Failed to load pregnancy journey dashboard', error)
       } finally {
@@ -66,6 +76,34 @@ export default function PregnancyJourney() {
     if (!progress) return 0
     return Math.min(100, Math.round((progress.waterIntake / progress.waterGoal) * 100))
   }, [progress])
+
+  const formatDate = (value) => value ? new Date(`${value}T00:00:00`).toLocaleDateString('en-IN', {
+    day: 'numeric', month: 'short', year: 'numeric',
+  }) : '—'
+
+  const savePregnancyDate = async (event) => {
+    event.preventDefault()
+    if (!dateValue) {
+      setDateError('Choose a date to continue.')
+      return
+    }
+
+    try {
+      setIsSavingDate(true)
+      setDateError('')
+      const response = await api.put('/api/journey/pregnancy-week', {
+        [dateMethod]: dateValue,
+      })
+      setPregnancyWeek(response.data)
+      const developmentResponse = await api.get('/api/journey/this-week-development')
+      setDevelopment(developmentResponse.data || {})
+    } catch (error) {
+      console.error('Failed to save pregnancy date', error)
+      setDateError('Unable to save this date. Please try again.')
+    } finally {
+      setIsSavingDate(false)
+    }
+  }
 
   if (loading) {
     return <div className="rounded-3xl border border-slate-200 bg-white p-8 text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">Loading your pregnancy dashboard…</div>
@@ -82,15 +120,91 @@ export default function PregnancyJourney() {
               Track progress, milestones, medicines, checklists, growth, and expenses in one calming view.
             </p>
           </div>
-          <div className="rounded-2xl border border-teal-200 bg-teal-50 px-5 py-3 text-sm font-semibold text-teal-700 dark:border-teal-800 dark:bg-teal-950/40 dark:text-teal-300">
-            Week {progress?.currentWeek ?? 19} • Day {progress?.currentDay ?? 2}
-          </div>
+          {pregnancyWeek?.dueDate && <div className="rounded-2xl border border-teal-200 bg-teal-50 px-5 py-3 text-sm font-semibold text-teal-700 dark:border-teal-800 dark:bg-teal-950/40 dark:text-teal-300">
+            Week {pregnancyWeek.currentWeek} • Day {pregnancyWeek.currentDay}
+          </div>}
         </div>
       </div>
 
+      {!pregnancyWeek?.dueDate ? (
+        <section className="rounded-3xl border border-teal-200 bg-teal-50 p-6 shadow-lg dark:border-teal-900 dark:bg-teal-950/20">
+          <p className="text-sm uppercase tracking-[0.2em] text-teal-700 dark:text-teal-300">Personalize your journey</p>
+          <h3 className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">When is your baby due?</h3>
+          <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-300">Add either an estimated due date or the first day of your last menstrual period. This is used only to calculate your pregnancy week and timeline.</p>
+          <form onSubmit={savePregnancyDate} className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-end">
+            <label className="flex-1 space-y-2 text-sm text-slate-700 dark:text-slate-200">
+              <span>{dateMethod === 'dueDate' ? 'Estimated due date' : 'First day of last menstrual period'}</span>
+              <input type="date" value={dateValue} onChange={(event) => setDateValue(event.target.value)} className="w-full rounded-2xl border border-teal-200 bg-white px-4 py-3 text-slate-900 outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-200 dark:border-teal-900 dark:bg-slate-950 dark:text-slate-100" required />
+            </label>
+            <div className="flex rounded-2xl border border-teal-200 bg-white p-1 dark:border-teal-900 dark:bg-slate-950">
+              <button type="button" onClick={() => setDateMethod('dueDate')} className={`rounded-xl px-3 py-2 text-sm font-semibold ${dateMethod === 'dueDate' ? 'bg-teal-600 text-white' : 'text-slate-600 dark:text-slate-300'}`}>Due date</button>
+              <button type="button" onClick={() => setDateMethod('lastMenstrualPeriod')} className={`rounded-xl px-3 py-2 text-sm font-semibold ${dateMethod === 'lastMenstrualPeriod' ? 'bg-teal-600 text-white' : 'text-slate-600 dark:text-slate-300'}`}>LMP</button>
+            </div>
+            <button type="submit" disabled={isSavingDate} className="rounded-2xl bg-teal-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-teal-700 disabled:opacity-60">{isSavingDate ? 'Saving...' : 'Save date'}</button>
+          </form>
+          {dateError && <p className="mt-3 text-sm font-medium text-rose-700 dark:text-rose-300">{dateError}</p>}
+        </section>
+      ) : (
+        <section className="rounded-3xl border border-teal-200 bg-teal-50 p-6 shadow-lg dark:border-teal-900 dark:bg-teal-950/20">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-sm uppercase tracking-[0.2em] text-teal-700 dark:text-teal-300">Current pregnancy week</p>
+              <h3 className="mt-2 text-3xl font-bold text-slate-900 dark:text-white">Week {pregnancyWeek.currentWeek}, {pregnancyWeek.trimester}</h3>
+              <p className="mt-2 text-slate-600 dark:text-slate-300">Week {pregnancyWeek.currentWeek} runs from {formatDate(pregnancyWeek.weekStart)} to {formatDate(pregnancyWeek.weekEnd)}.</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="rounded-2xl border border-teal-200 bg-white px-5 py-3 dark:border-teal-900 dark:bg-slate-900">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Days remaining</p>
+                <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">{pregnancyWeek.daysRemaining}</p>
+              </div>
+              <button type="button" onClick={() => { setDateValue(pregnancyWeek.dueDate); setDateMethod('dueDate'); setPregnancyWeek({}) }} className="rounded-full border border-teal-300 px-4 py-2 text-sm font-semibold text-teal-800 transition hover:bg-teal-100 dark:border-teal-800 dark:text-teal-200 dark:hover:bg-teal-950/50">Update date</button>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {pregnancyWeek?.dueDate && development?.week && (
+        <section className="rounded-3xl border border-cyan-200 bg-cyan-50 p-6 shadow-lg dark:border-cyan-900 dark:bg-cyan-950/20">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <p className="text-sm uppercase tracking-[0.2em] text-cyan-700 dark:text-cyan-300">This week&apos;s development</p>
+              <h3 className="mt-2 text-2xl font-bold text-slate-900 dark:text-white">Week {development.week}: {development.size}-sized</h3>
+              <p className="mt-2 max-w-2xl text-slate-600 dark:text-slate-300">{development.summary}</p>
+            </div>
+            <div className="grid grid-cols-2 gap-3 sm:min-w-64">
+              <div className="rounded-2xl border border-cyan-200 bg-white px-4 py-3 dark:border-cyan-900 dark:bg-slate-900">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Approx. length</p>
+                <p className="mt-1 font-bold text-slate-900 dark:text-white">{development.length}</p>
+              </div>
+              <div className="rounded-2xl border border-cyan-200 bg-white px-4 py-3 dark:border-cyan-900 dark:bg-slate-900">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Approx. weight</p>
+                <p className="mt-1 font-bold text-slate-900 dark:text-white">{development.weight}</p>
+              </div>
+            </div>
+          </div>
+          <div className="mt-6 grid gap-4 lg:grid-cols-2">
+            <div className="rounded-2xl border border-cyan-200/80 bg-white/80 p-4 dark:border-cyan-900 dark:bg-slate-900/70">
+              <h4 className="font-semibold text-slate-900 dark:text-white">Common body changes</h4>
+              <ul className="mt-3 space-y-2 text-sm text-slate-600 dark:text-slate-300">
+                {(development.bodyChanges || []).map((item) => <li key={item}>• {item}</li>)}
+              </ul>
+            </div>
+            <div className="rounded-2xl border border-cyan-200/80 bg-white/80 p-4 dark:border-cyan-900 dark:bg-slate-900/70">
+              <h4 className="font-semibold text-slate-900 dark:text-white">Comfort ideas</h4>
+              <ul className="mt-3 space-y-2 text-sm text-slate-600 dark:text-slate-300">
+                {(development.comfortSuggestions || []).map((item) => <li key={item}>• {item}</li>)}
+              </ul>
+            </div>
+          </div>
+          <p className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+            {development.careNote}
+          </p>
+        </section>
+      )}
+
       <div className="grid gap-4 xl:grid-cols-4 md:grid-cols-2">
         {[
-          { label: 'Current Pregnancy', value: `${progress?.currentWeek ?? 19} Weeks ${progress?.currentDay ?? 2} Days`, tone: 'teal' },
+          { label: 'Current Pregnancy', value: pregnancyWeek?.dueDate ? `${pregnancyWeek.currentWeek} Weeks ${pregnancyWeek.currentDay} Days` : 'Set your dates', tone: 'teal' },
           { label: 'Baby Size', value: progress?.babySize ?? 'Bell pepper', tone: 'purple' },
           { label: 'Next Appointment', value: progress?.nextAppointment ?? '2026-07-16', tone: 'amber' },
           { label: 'Today’s Medicine', value: progress?.todayMedicine ?? 'Prenatal vitamin', tone: 'rose' },

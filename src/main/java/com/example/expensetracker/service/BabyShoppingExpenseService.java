@@ -31,6 +31,9 @@ public class BabyShoppingExpenseService {
         return repository.findById(id)
                 .map(existing -> {
                     existing.setDescription(expense.getDescription());
+                    existing.setItemName(expense.getItemName());
+                    existing.setQuantity(expense.getQuantity());
+                    existing.setSizeAgeRange(expense.getSizeAgeRange());
                     existing.setAmount(expense.getAmount());
                     existing.setDate(expense.getDate());
                     existing.setCategory(expense.getCategory());

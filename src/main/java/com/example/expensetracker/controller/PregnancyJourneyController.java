@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.time.LocalDate;
 
 @RestController
 @RequestMapping("/api/journey")
@@ -26,6 +27,23 @@ public class PregnancyJourneyController {
     @GetMapping("/progress")
     public ResponseEntity<Map<String, Object>> getProgress() {
         return ResponseEntity.ok(service.getProgress());
+    }
+
+    @GetMapping("/pregnancy-week")
+    public ResponseEntity<Map<String, Object>> getPregnancyWeek() {
+        return ResponseEntity.ok(service.getPregnancyWeek());
+    }
+
+    @GetMapping("/this-week-development")
+    public ResponseEntity<Map<String, Object>> getThisWeekDevelopment() {
+        return ResponseEntity.ok(service.getThisWeekDevelopment());
+    }
+
+    @PutMapping("/pregnancy-week")
+    public ResponseEntity<Map<String, Object>> savePregnancyWeek(@RequestBody Map<String, String> request) {
+        LocalDate dueDate = parseDate(request.get("dueDate"));
+        LocalDate lastMenstrualPeriod = parseDate(request.get("lastMenstrualPeriod"));
+        return ResponseEntity.ok(service.savePregnancyDates(dueDate, lastMenstrualPeriod));
     }
 
     @GetMapping("/timeline")
@@ -50,7 +68,7 @@ public class PregnancyJourneyController {
 
     @PostMapping("/{month}/note")
     public ResponseEntity<PregnancyJourneyNote> addNote(@PathVariable int month,
-                                                       @RequestBody Map<String, String> request) {
+            @RequestBody Map<String, String> request) {
         String note = request.getOrDefault("note", "");
         String milestone = request.getOrDefault("milestone", "");
         return ResponseEntity.ok(service.saveNote(month, note, milestone));
@@ -58,9 +76,13 @@ public class PregnancyJourneyController {
 
     @PutMapping("/{month}/note")
     public ResponseEntity<PregnancyJourneyNote> updateNote(@PathVariable int month,
-                                                         @RequestBody Map<String, String> request) {
+            @RequestBody Map<String, String> request) {
         String note = request.getOrDefault("note", "");
         String milestone = request.getOrDefault("milestone", "");
         return ResponseEntity.ok(service.updateNote(month, note, milestone));
+    }
+
+    private LocalDate parseDate(String value) {
+        return value == null || value.isBlank() ? null : LocalDate.parse(value);
     }
 }
